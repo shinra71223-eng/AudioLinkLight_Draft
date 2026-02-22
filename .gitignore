@@ -1,0 +1,24 @@
+# Python virtual environment (recreate with setup_env.bat)
+.venv/
+
+# Demucs separated audio cache (generated at runtime)
+separated/
+
+# Temporary/utility scripts
+fix_paths.py
+fix_remaining_paths.py
+verify_state.py
+verify_state2.py
+dump_all_nodes.py
+dump_demucs_scripts.py
+parse_network.py
+network_dump.json
+demucs_scripts_dump.json
+
+# TouchDesigner backup files
+*.toe.1
+*.toe.2
+
+# Python cache
+__pycache__/
+*.pyc
