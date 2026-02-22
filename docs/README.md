@@ -1,44 +1,19 @@
-# AudioLinkLight Quick Start Guide (v01)
+# AudioLinkCore_V01 Release
 
-ようこそ！
-`AudioLinkLight` は、TouchDesigner内で音声信号を単なる「音階・音量」ではなく、**「人間の感情・熱量（Intensity）」**や**「鋭利なリズムトリガー」**として抽出する、軽量で高速なオーディオ解析エンジンです。
+This folder contains the complete and final assets for **AudioLinkCore V01**, featuring robust max-1.0 envelopes, dynamic 1-channel fallback, and the V2 DemucsManager patch.
 
-このエンジンが出力する信号を各自の `VisualEngine`（描画コンポーネント）に繋ぎ込むだけで、音楽と完璧に同期して呼吸するようなインタラクティブアートや、LEDイルミネーションを簡単に作成できます。
+## Contents
+* `AudioLinkCore_V01.tox` : Use TouchDesigner to save your `AudioLinkCore` COMP component out to this directory to bundle it for git. (Right-click AudioLinkCore -> "Save Component .tox")
+* `build_demucs_manager_v2.py` : Script to deploy the updated DemucsManager (safety patched) to any new project.
+* `Developer_Guide.md` : Technical architecture parameters and logic documentation.
+* `dats/` : A folder tracking the absolute exact Python logic stored within the `parse_*_callbacks` scripts in your V01 TD environment.
 
----
+## What's New in V01
+1. **Mathematics Guarantee:** Kick, Snare, Hihat, and Clap hits output exactly `1.0` upon detection, ensuring no missed thresholds in your visual engine.
+2. **Absolute Reliability (Fallback):** If your target file doesn't have an AI-separated vocal track, AudioLinkCore catches the exception and dynamically recycles the instrumental track into the vocal parser using dual-referencing to mimic context emotion. It never crashes.
+3. **Safety Caching (V2):** Your manager validates actual WAV presence (`vocals.wav` and `no_vocals.wav`) before trusting cache `.json` files.
 
-## 🚀 1. 使い方（超クイックスタート）
-
-1. **TouchDesignerプロジェクトを開く**
-   提供された `AudioLinkLight_*.toe` を使用してください。
-2. **信号の取り出し口**
-   `AudioLinkLight` コンポーネント内の最後段にある **`out1`** (または `out1_export`) から全ての解析済みデータ（CHOPチャンネル）が出力されています。
-3. **あなたのVisualEngineへの接続**
-   ご自身のコンポーネント内に `Select CHOP` を作り、CHOPSパラメータに `../AudioLinkLight/out1` と指定するだけで、感情データを受信できます。あとはこれをパーティクルやジオメトリの大きさにリンク（Reference）させるだけです！
-
----
-
-## 🎛️ 2. 出力信号一覧 (すぐに使えるパラメータ)
-
-`out1` からは以下のチャンネルが毎フレーム（60fps）出力されます。値は全て **0.0 〜 1.0 に正規化** されているため、安全に掛け算に使えます。
-
-### 🎤 ボーカル＆メロディ系（有機的・感情的）
-*   **`uVocalIntensity`**: [激アツ] ボーカルの「感情曲線」。単なる音量ではなく、サスティン（ロングトーン）や息継ぎ（V-Valley）、手数の多さを統合した熱量。普段は0.5付近で漂い、サビのハイライトで1.0へ爆発します。
-*   **`uMelodyIntensity`**: ギターやシンセ等の熱量。ボーカルより反応が速く（Fast EMA）、超絶技巧のアルペジオなどで一気に跳ね上がります。
-
-### 🥁 リズム系（鋭角的・トリガー）
-*   **`Kick`**: ドナルドダックの足音のような鋭いキック。
-*   **`Snare`** / **`Hihat`**: スネアとハイハット。
-*   **`Clap`**: [超高感度] キックの高音成分（Click）のロジックを用い、2000-5000Hzの鋭利なトランジェントを捉えた手拍子トリガー。
-
-### 🎸 ベース系（重圧感）
-*   **`uBassEnergy`**: メインのベースライン。曲を通したダイナミックな音量変化に自動で追従（正規化）し、静かなAメロでもしっかり躍動します。
-*   **`uSubBass`**: 鼓膜を揺らす重低音（40Hz付近）。
-*   **`uSidechain`**: キックが鳴った瞬間に「スンッ」と下がるダッキング信号。映像全体を心臓の鼓動のように脈打たせるのに便利です。
-
----
-
-## 🛠️ 3. 次のステップ
-
-*   **「中の仕組みを知りたい」「自分で新しい楽器の検出器を作りたい」** というエンジニアの方は、同梱の `Developer_Guide.md` をお読みください！
-*   各種センサー（LiDAR、Kinect、シリアル通信）との連携（**マルチモーダル化**）や、ESP32への送信についてのアーキテクチャもガイドに記載されています。
+## How To Install in a New Project
+1. Drag and drop `AudioLinkCore_V01.tox` into your new TouchDesigner grid.
+2. Drag and drop `build_demucs_manager_v2.py` into a Text DAT and click "Run Script".
+3. Hook your Audio File Out to Demucs, and hook Demucs into AudioLink!
