@@ -1,19 +1,84 @@
-# AudioLinkCore_V01 Release
+# AudioLinkLight Quick Start Guide
 
-This folder contains the complete and final assets for **AudioLinkCore V01**, featuring robust max-1.0 envelopes, dynamic 1-channel fallback, and the V2 DemucsManager patch.
+`AudioLinkLight` は、TouchDesigner内で音声信号を**「人間の感情・熱量（Intensity）」**や**「鋭利なリズムトリガー」**として抽出する、軽量で高速なオーディオ解析エンジンです。
 
-## Contents
-* `AudioLinkCore_V01.tox` : Use TouchDesigner to save your `AudioLinkCore` COMP component out to this directory to bundle it for git. (Right-click AudioLinkCore -> "Save Component .tox")
-* `build_demucs_manager_v2.py` : Script to deploy the updated DemucsManager (safety patched) to any new project.
-* `Developer_Guide.md` : Technical architecture parameters and logic documentation.
-* `dats/` : A folder tracking the absolute exact Python logic stored within the `parse_*_callbacks` scripts in your V01 TD environment.
+---
 
-## What's New in V01
-1. **Mathematics Guarantee:** Kick, Snare, Hihat, and Clap hits output exactly `1.0` upon detection, ensuring no missed thresholds in your visual engine.
-2. **Absolute Reliability (Fallback):** If your target file doesn't have an AI-separated vocal track, AudioLinkCore catches the exception and dynamically recycles the instrumental track into the vocal parser using dual-referencing to mimic context emotion. It never crashes.
-3. **Safety Caching (V2):** Your manager validates actual WAV presence (`vocals.wav` and `no_vocals.wav`) before trusting cache `.json` files.
+## 🚀 1. セットアップ（新しいPCの場合）
 
-## How To Install in a New Project
-1. Drag and drop `AudioLinkCore_V01.tox` into your new TouchDesigner grid.
-2. Drag and drop `build_demucs_manager_v2.py` into a Text DAT and click "Run Script".
-3. Hook your Audio File Out to Demucs, and hook Demucs into AudioLink!
+### 必要なもの
+* **TouchDesigner** 2025.3以降
+* **Python** 3.10以降（システムにインストール済みであること）
+
+### 手順
+
+1. **リポジトリをクローン**（または `.toe` ファイルをコピー）
+2. **`setup_env.bat` をダブルクリック**して実行
+   - Python仮想環境（`.venv`）が自動作成されます
+   - Demucs 4.0.1 + PyTorch 等の依存パッケージがインストールされます
+   - `separated/fast/` `separated/hq/` 出力フォルダが作成されます
+3. **`AudioLinkLight_V00.toe`** をTouchDesignerで開く
+
+> **⚠️ 注意**: `.venv` と `separated/` はGit管理外です。新しいPCでは必ず `setup_env.bat` を実行してください。
+
+---
+
+## 🎵 2. Demucs 自動分離の仕組み
+
+AudioLinkLightは **Demucs** を使って音声を `Vocal` と `Non-Vocal`（Instruments）の2つの波形に自動分離します。
+
+1. `Audio_File_IN_IO` で曲を再生開始
+2. `watch_file_io` がファイル変更を自動検知
+3. `DemucsBridge` が `separated/` フォルダ内にキャッシュを確認
+4. **キャッシュあり** → 即座に分離データを読み込み
+5. **キャッシュなし** → Demucsプロセスがバックグラウンドで分離を実行 → 完了後に自動読み込み
+
+> 分離品質は2段階（FAST → HQ）で自動アップグレードされます。
+
+---
+
+## 🎛️ 3. 出力信号一覧
+
+`out1` からは以下のチャンネルが毎フレーム（60fps）出力されます。値は全て **0.0 〜 1.0 に正規化** されています。
+
+### 🎤 ボーカル＆メロディ系
+* **`uVocalIntensity`**: ボーカルの「感情曲線」。サスティンや息継ぎ、手数の多さを統合した熱量。
+* **`uMelodyIntensity`**: ギターやシンセ等の熱量。
+
+### 🥁 リズム系
+* **`Kick`** / **`Snare`** / **`Hihat`** / **`Clap`**: 鋭角的なリズムトリガー。
+
+### 🎸 ベース系
+* **`uBassEnergy`**: メインベースライン（動的正規化）
+* **`uSubBass`**: 重低音（40Hz付近）
+* **`uSidechain`**: キック連動のダッキング信号
+
+---
+
+## 📁 4. プロジェクト構造
+
+```
+AudioLinkLight/
+├── AudioLinkLight_V00.toe    # メインプロジェクト
+├── AudioLinkCore_V01.tox     # コアエンジン（コンポーネント）
+├── requirements.txt          # Python依存パッケージ一覧
+├── setup_env.bat             # 環境構築スクリプト（新PC用）
+├── .gitignore
+├── docs/
+│   ├── README.md             # このファイル
+│   └── Developer_Guide.md   # エンジニア向け技術仕様書
+├── scripts/
+│   ├── demucs_separator.py   # Demucs分離スクリプト
+│   └── dats/                 # parse_*_callbacks のPythonソース
+├── .venv/                    # Python仮想環境（Git管理外）
+└── separated/                # Demucs分離キャッシュ（Git管理外）
+    ├── fast/
+    └── hq/
+```
+
+---
+
+## 🛠️ 5. 次のステップ
+
+* **中の仕組みを知りたい方** → `Developer_Guide.md` をお読みください
+* **VisualEngineへの接続** → `Select CHOP` で `../AudioLinkLight_V01/AudioLinkCore/out1` を参照するだけ！
