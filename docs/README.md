@@ -9,6 +9,7 @@
 ### 必要なもの
 * **TouchDesigner** 2025.3以降
 * **Python** 3.10以降（システムにインストール済みであること）
+* **インターネット接続**（初回セットアップ時のみ）
 
 ### 手順
 
@@ -16,10 +17,16 @@
 2. **`setup_env.bat` をダブルクリック**して実行
    - Python仮想環境（`.venv`）が自動作成されます
    - Demucs 4.0.1 + PyTorch 等の依存パッケージがインストールされます
-   - `separated/fast/` `separated/hq/` 出力フォルダが作成されます
-3. **`AudioLinkLight_V00.toe`** をTouchDesignerで開く
+   - **FFmpeg** が自動ダウンロード・配置されます
+   - `separated/` `media/music/` 等のフォルダが作成されます
+3. **`media/music/` に音楽ファイルを配置**（MP3, WAV, FLAC）
+4. **`AudioLinkLight_V00.toe`** をTouchDesignerで開く
+5. Textportで以下を実行して音楽フォルダのパスを設定：
+   ```python
+   exec(open(project.folder + '/scripts/fix_music_paths.py', encoding='utf-8').read())
+   ```
 
-> **⚠️ 注意**: `.venv` と `separated/` はGit管理外です。新しいPCでは必ず `setup_env.bat` を実行してください。
+> **⚠️ 注意**: `.venv`、`separated/`、`bin/` はGit管理外です。新しいPCでは必ず `setup_env.bat` を実行してください。
 
 ---
 

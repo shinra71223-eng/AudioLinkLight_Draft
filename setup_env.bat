@@ -1,10 +1,9 @@
 @echo off
 REM ============================================
-REM AudioLinkLight - Demucs Environment Setup
+REM AudioLinkLight - Environment Setup
 REM ============================================
-REM Run this script on a new PC to set up the
-REM Python virtual environment with Demucs.
-REM Requires: Python 3.10+ installed on the system
+REM Run this on a new PC to set up everything.
+REM Requires: Python 3.10+, Internet connection
 REM ============================================
 
 echo.
@@ -13,56 +12,90 @@ echo  AudioLinkLight - Environment Setup
 echo ========================================
 echo.
 
-REM Check if Python is available
+REM Check Python
 python --version >nul 2>&1
 if errorlevel 1 (
-    echo [ERROR] Python is not installed or not in PATH.
-    echo Please install Python 3.10+ from https://python.org
+    echo [ERROR] Python not found. Install Python 3.10+ from https://python.org
     pause
     exit /b 1
 )
 
-REM Check if .venv already exists
+REM ---- Step 1: Python venv ----
 if exist ".venv\Scripts\python.exe" (
-    echo [INFO] .venv already exists. Skipping creation.
-    echo [INFO] To recreate, delete the .venv folder first.
-    goto :install_packages
+    echo [1/4] .venv already exists. Skipping.
+) else (
+    echo [1/4] Creating virtual environment...
+    python -m venv .venv
+    if errorlevel 1 (
+        echo [ERROR] Failed to create .venv
+        pause
+        exit /b 1
+    )
 )
 
-echo [1/3] Creating virtual environment...
-python -m venv .venv
-if errorlevel 1 (
-    echo [ERROR] Failed to create virtual environment.
-    pause
-    exit /b 1
-)
-
-:install_packages
-echo [2/3] Installing packages (this may take a while)...
-echo       - PyTorch + torchaudio
-echo       - Demucs 4.0.1
-echo.
-
+echo [2/4] Installing Python packages...
 .venv\Scripts\pip.exe install -r requirements.txt
 if errorlevel 1 (
-    echo [ERROR] Package installation failed.
+    echo [ERROR] pip install failed
     pause
     exit /b 1
 )
 
-REM Create separated folders if missing
-echo [3/3] Creating output directories...
+REM ---- Step 3: FFmpeg ----
+if exist "bin\ffmpeg.exe" (
+    echo [3/4] FFmpeg already exists. Skipping.
+) else (
+    echo [3/4] Downloading FFmpeg...
+    mkdir bin 2>nul
+
+    REM Download ffmpeg release (essentials build)
+    set FFMPEG_URL=https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip
+    set FFMPEG_ZIP=bin\ffmpeg_download.zip
+
+    echo       Downloading from %FFMPEG_URL%
+    powershell -Command "Invoke-WebRequest -Uri '%FFMPEG_URL%' -OutFile '%FFMPEG_ZIP%'" 2>nul
+    if errorlevel 1 (
+        echo       [Fallback] Trying curl...
+        curl -L -o "%FFMPEG_ZIP%" "%FFMPEG_URL%"
+    )
+
+    if exist "%FFMPEG_ZIP%" (
+        echo       Extracting ffmpeg.exe...
+        powershell -Command "$zip = [System.IO.Compression.ZipFile]::OpenRead('%FFMPEG_ZIP%'); $entry = $zip.Entries | Where-Object { $_.Name -eq 'ffmpeg.exe' } | Select-Object -First 1; if ($entry) { [System.IO.Compression.ZipFileExtensions]::ExtractToFile($entry, 'bin\ffmpeg.exe', $true) }; $zip.Dispose()"
+        del "%FFMPEG_ZIP%" 2>nul
+        if exist "bin\ffmpeg.exe" (
+            echo       FFmpeg installed successfully!
+        ) else (
+            echo       [WARNING] Could not extract ffmpeg.exe. Please download manually:
+            echo       https://www.gyan.dev/ffmpeg/builds/
+            echo       Place ffmpeg.exe in the bin\ folder.
+        )
+    ) else (
+        echo       [WARNING] Download failed. Please download FFmpeg manually:
+        echo       https://www.gyan.dev/ffmpeg/builds/
+        echo       Place ffmpeg.exe in the bin\ folder.
+    )
+)
+
+REM ---- Step 4: Create folders ----
+echo [4/4] Creating directories...
 if not exist "separated\fast" mkdir "separated\fast"
 if not exist "separated\hq" mkdir "separated\hq"
+if not exist "media\music" mkdir "media\music"
 
 echo.
 echo ========================================
 echo  Setup Complete!
 echo ========================================
-echo  .venv created with Demucs %DEMUCS_VER%
-echo  separated/fast/ and separated/hq/ ready
 echo.
-echo  Open AudioLinkLight_V00.toe in
-echo  TouchDesigner to start working.
-echo ========================================
+echo  Next steps:
+echo  1. Place music files in media\music\
+echo  2. Open AudioLinkLight_V00.toe in TouchDesigner
+echo.
+if not exist "bin\ffmpeg.exe" (
+    echo  [!] FFmpeg was not installed automatically.
+    echo      Download from https://www.gyan.dev/ffmpeg/builds/
+    echo      Place ffmpeg.exe in the bin\ folder.
+    echo.
+)
 pause
