@@ -1,0 +1,8 @@
+Vertex Shader Compile Results:
+
+Compiled Successfully
+
+=============
+Pixel Shader Compile Results:
+ERROR: /AudioLinkLight_V01/TEST_SCREEN/cyber_clock_pixel5:141: 'sTD2DInputs' : undeclared identifier 
+ERROR: 1 compilation errors.  No code generated.
