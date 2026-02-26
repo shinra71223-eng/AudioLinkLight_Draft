@@ -12,7 +12,13 @@ Backup/
 *.toe.1
 *.toe.2
 
-# Temporary/utility scripts
+# PlatformIO build artifacts
+scripts/esp32/.pio/
+
+# Music files (large binaries - bring your own)
+media/music/
+
+# Debug/diagnostic/one-shot utility scripts (no longer needed)
 fix_paths.py
 fix_remaining_paths.py
 fix_tier0_fallback.py
@@ -29,8 +35,13 @@ diagnose_demucs.py
 parse_network.py
 network_dump.json
 demucs_scripts_dump.json
+exac_search_results.json
+td_files_dump.json
+td_files_detailed.json
+glsl_errors.txt
+glsl_errors_2.txt
+glsl_errors_test2.txt
 
 # Python cache
 __pycache__/
 *.pyc
-
