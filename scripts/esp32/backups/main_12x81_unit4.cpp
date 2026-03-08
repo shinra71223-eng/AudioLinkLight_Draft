@@ -27,17 +27,12 @@ void expandToLEDs() {
 void setup() {
   Serial.begin(BAUD);
   Serial.setRxBufferSize(8192);
-
   FastLED.addLeds<WS2812B, PIN_LED, GRB>(leds, NUM_LEDS);
-
-  // 輝度を 50/255 に設定 (点灯確認後の調整)
   FastLED.setMaxPowerInVoltsAndMilliamps(5, 4000);
   FastLED.setBrightness(50);
-
-  // 起動テスト: 全消灯から白1回点滅
-  fill_solid(leds, NUM_LEDS, CRGB::White);
+  fill_solid(leds, NUM_LEDS, CRGB::Blue);
   FastLED.show();
-  delay(300);
+  delay(500);
   FastLED.clear(true);
   FastLED.show();
 }
@@ -48,24 +43,19 @@ void loop() {
       Serial.read();
       continue;
     }
-
     if (Serial.available() < 4)
       return;
-
-    Serial.read(); // 0x55
+    Serial.read();
     if (Serial.read() == 0xAA) {
       uint8_t lsb = Serial.read();
       uint8_t msb = Serial.read();
       uint16_t numPixels = lsb | (msb << 8);
       uint16_t numBytes = numPixels * 3;
-
       if (numBytes == sizeof(imageBuf)) {
         size_t received = Serial.readBytes(imageBuf, numBytes);
         if (received == numBytes) {
           expandToLEDs();
           FastLED.show();
-          // 受信成功をTDにこっそり通知 (デバッグ用)
-          // Serial.write('!');
         }
       }
     }
