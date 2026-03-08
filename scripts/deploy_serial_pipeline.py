@@ -166,7 +166,7 @@ serial_out = parent.create(serialCHOP, 'serial_out')
 serial_out.inputConnectors[0].connect(top_to_chop)
 
 # シリアルパラメータ（dump_op_params.py で確認済みの正しいパラメータ名）
-serial_out.par.baudrate  = 921600
+serial_out.par.baudrate  = 2000000
 serial_out.par.port      = 'COM3'   # CH340 ポート
 serial_out.par.databits  = 8
 serial_out.par.parity    = 'none'

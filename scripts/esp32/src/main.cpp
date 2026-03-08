@@ -1,95 +1,114 @@
-﻿#include <Arduino.h>
+#include <Arduino.h>
 #include <FastLED.h>
 
-static constexpr int  NUM_LEDS_A     = 440;
-static constexpr int  NUM_LEDS_B     = 440;
-static constexpr int  NUM_LEDS_TOTAL = 880;
-static constexpr int  PIN_A          = 4;
-static constexpr int  PIN_B          = 5;
-static constexpr int  MAX_MA         = 3000;
-static constexpr long SERIAL_BAUD    = 921600;
+// --- 定数定義 ---
+#define NUM_COLS 88
+#define NUM_ROWS_A 5
+#define NUM_ROWS_B 5
+#define NUM_LEDS_A 440
+#define NUM_LEDS_B 440
+#define TOTAL_LEDS 880
+
+// ピン設定 (とりあえず 1, 3 と、Masterで使われる 5, 4 も定義しておく)
+// ユーザが物理的にどこに繋いでいるか不明なため、setupで複数定義するか検討
+#define PIN_A 1
+#define PIN_B 3
+#define PIN_STATUS 21 // Stamp S3 Onboard LED
+#define BAUD 2000000
 
 CRGB ledsA[NUM_LEDS_A];
 CRGB ledsB[NUM_LEDS_B];
+uint8_t imageBuf[TOTAL_LEDS * 3];
 
-static uint8_t rxBuf[NUM_LEDS_TOTAL * 3];
-static uint32_t framesReceived = 0;
-
-static constexpr int  COLS          = 88;
-static constexpr int  ROWS_PER_STRIP = 5;  // each strip covers 5 rows
-
-void applyFrame(uint16_t count) {
-    // ledsA: rows 0-4, each strip is its own serpentine
-    for (int i = 0; i < NUM_LEDS_A && i < (int)count; i++) {
-        int row_in_strip = i / COLS;           // 0..4
-        int col_in_row   = i % COLS;           // 0..87
-        int canvas_col   = (row_in_strip % 2 == 0) ? col_in_row : (COLS - 1 - col_in_row);
-        int canvas_row   = row_in_strip;       // 0..4
-        int src = (canvas_row * COLS + canvas_col) * 3;
-        ledsA[i] = CRGB(rxBuf[src], rxBuf[src+1], rxBuf[src+2]);
+void expandToLEDs() {
+  for (int row_in_a = 0; row_in_a < 5; row_in_a++) {
+    int y_physical = row_in_a;
+    int y_img = 9 - y_physical;
+    for (int col = 0; col < NUM_COLS; col++) {
+      int col_in_strip = (row_in_a % 2 == 0) ? col : (NUM_COLS - 1 - col);
+      int ledIdx = row_in_a * NUM_COLS + col_in_strip;
+      int src = (y_img * NUM_COLS + col) * 3;
+      ledsA[ledIdx].r = imageBuf[src];
+      ledsA[ledIdx].g = imageBuf[src + 1];
+      ledsA[ledIdx].b = imageBuf[src + 2];
     }
-    // ledsB: rows 5-9, same serpentine pattern within this strip
-    for (int i = 0; i < NUM_LEDS_B && (NUM_LEDS_A + i) < (int)count; i++) {
-        int row_in_strip = i / COLS;           // 0..4
-        int col_in_row   = i % COLS;           // 0..87
-        int canvas_col   = (row_in_strip % 2 == 0) ? col_in_row : (COLS - 1 - col_in_row);
-        int canvas_row   = ROWS_PER_STRIP + row_in_strip;  // 5..9
-        int src = (canvas_row * COLS + canvas_col) * 3;
-        ledsB[i] = CRGB(rxBuf[src], rxBuf[src+1], rxBuf[src+2]);
+  }
+  for (int row_in_b = 0; row_in_b < 5; row_in_b++) {
+    int y_physical = 5 + row_in_b;
+    int y_img = 9 - y_physical;
+    for (int col = 0; col < NUM_COLS; col++) {
+      int col_in_strip = (row_in_b % 2 == 0) ? col : (NUM_COLS - 1 - col);
+      int ledIdx = row_in_b * NUM_COLS + col_in_strip;
+      int src = (y_img * NUM_COLS + col) * 3;
+      ledsB[ledIdx].r = imageBuf[src];
+      ledsB[ledIdx].g = imageBuf[src + 1];
+      ledsB[ledIdx].b = imageBuf[src + 2];
     }
-    FastLED.show();
+  }
 }
 
 void setup() {
-    FastLED.addLeds<WS2812B, PIN_A, GRB>(ledsA, NUM_LEDS_A);
-    FastLED.addLeds<WS2812B, PIN_B, GRB>(ledsB, NUM_LEDS_B);
-    FastLED.setMaxPowerInVoltsAndMilliamps(5, MAX_MA);
-    FastLED.setBrightness(10);   // global brightness cap (0-255)
-    FastLED.clear(true);
+  Serial.begin(BAUD);
+  Serial.setRxBufferSize(8192);
 
-    Serial.begin(SERIAL_BAUD);
-    Serial.setTimeout(500);  // readBytes timeout = 500ms
-    unsigned long t0 = millis();
-    while (!Serial && (millis() - t0) < 3000) { delay(10); }
+  pinMode(PIN_STATUS, OUTPUT);
+  digitalWrite(PIN_STATUS,
+               HIGH); // 消灯(StampS3はActive Lowの場合があるが一旦HIGH)
 
-    // Startup: brief white flash
-    fill_solid(ledsA, NUM_LEDS_A, CRGB(30, 30, 30));
-    fill_solid(ledsB, NUM_LEDS_B, CRGB(30, 30, 30));
-    FastLED.show(); delay(300);
-    FastLED.clear(true);
+  FastLED.addLeds<WS2812B, PIN_A, GRB>(ledsA, NUM_LEDS_A);
+  FastLED.addLeds<WS2812B, PIN_B, GRB>(ledsB, NUM_LEDS_B);
+
+  FastLED.setMaxPowerInVoltsAndMilliamps(5, 4000);
+  FastLED.setBrightness(100);
+
+  // 起動確認: 青色に全点灯
+  fill_solid(ledsA, NUM_LEDS_A, CRGB::Blue);
+  fill_solid(ledsB, NUM_LEDS_B, CRGB::Blue);
+  FastLED.show();
+  delay(500);
+  FastLED.clear(true);
+  FastLED.show();
 }
 
+uint32_t lastFrameMs = 0;
+bool statusLed = false;
+
 void loop() {
-    // Step 1: Wait for magic byte 0x55
-    if (Serial.available() < 1) return;
-    uint8_t b1 = Serial.read();
-    if (b1 != 0x55) return;
-
-    // Step 2: Wait for 0xAA (with short timeout)
-    unsigned long t0 = millis();
-    while (!Serial.available()) {
-        if (millis() - t0 > 100) return;
+  // 同期処理: 0x55 0xAA を探す
+  while (Serial.available() > 0) {
+    if (Serial.peek() != 0x55) {
+      Serial.read(); // 0x55 以外は捨てる
+      continue;
     }
-    uint8_t b2 = Serial.read();
-    if (b2 != 0xAA) return;
 
-    // Step 3: Read count (2 bytes)
-    uint8_t hdr[2];
-    size_t got = Serial.readBytes(hdr, 2);
-    if (got < 2) return;
+    // 0x55 が見つかったが、バッファに4バイト以上ない場合は次周へ
+    if (Serial.available() < 4)
+      return;
 
-    uint16_t count = hdr[0] | ((uint16_t)hdr[1] << 8);
-    if (count == 0 || count > NUM_LEDS_TOTAL) return;
+    Serial.read(); // 0x55
+    if (Serial.read() == 0xAA) {
+      uint8_t lsb = Serial.read();
+      uint8_t msb = Serial.read();
+      uint16_t numPixels = lsb | (msb << 8);
+      uint16_t numBytes = numPixels * 3;
 
-    // Step 4: Bulk read all RGB data at once
-    uint16_t need = count * 3;
-    size_t received = Serial.readBytes(rxBuf, need);
+      if (numBytes == 2640) {
+        size_t received = Serial.readBytes(imageBuf, numBytes);
+        if (received == numBytes) {
+          expandToLEDs();
+          FastLED.show();
 
-    if (received == need) {
-        applyFrame(count);
-        framesReceived++;
-        // NOTE: Do NOT drain here - next frame may have buffered in USB-CDC during show()
-        // Send ACK so host knows we are ready for next frame
-        Serial.write('K');
+          // ステータスLEDを反転 (受信している証拠)
+          statusLed = !statusLed;
+          digitalWrite(PIN_STATUS, statusLed ? LOW : HIGH);
+          lastFrameMs = millis();
+        }
+      }
     }
+  }
+
+  // 1秒以上受信がない場合は青色のまま（または消灯）
+  if (millis() - lastFrameMs > 1000) {
+    // digitalWrite(PIN_STATUS, HIGH);
+  }
 }
