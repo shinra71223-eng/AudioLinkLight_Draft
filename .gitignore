@@ -1,0 +1,47 @@
+# Python virtual environment (recreate with setup_env.bat)
+.venv/
+
+# Demucs separated audio cache (generated at runtime)
+separated/
+
+# FFmpeg binary (auto-downloaded by setup_env.bat)
+bin/
+
+# TouchDesigner backup files
+Backup/
+*.toe.1
+*.toe.2
+
+# PlatformIO build artifacts
+scripts/esp32/.pio/
+
+# Music files (large binaries - bring your own)
+media/music/
+
+# Debug/diagnostic/one-shot utility scripts (no longer needed)
+fix_paths.py
+fix_remaining_paths.py
+fix_tier0_fallback.py
+fix_tier0_fallback_v2.py
+fix_tier_switch_timing.py
+move_fallback_into_demucs.py
+verify_state.py
+verify_state2.py
+verify_td_api.py
+verify_connector_api.py
+dump_all_nodes.py
+dump_demucs_scripts.py
+diagnose_demucs.py
+parse_network.py
+network_dump.json
+demucs_scripts_dump.json
+exac_search_results.json
+td_files_dump.json
+td_files_detailed.json
+glsl_errors.txt
+glsl_errors_2.txt
+glsl_errors_test2.txt
+
+# Python cache
+__pycache__/
+*.pyc
