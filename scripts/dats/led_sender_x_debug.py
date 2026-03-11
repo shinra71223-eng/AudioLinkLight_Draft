@@ -20,6 +20,7 @@ SOURCE_TOP  = get_par('Sourcetop', 'led_source_USB')
 
 _ser = None
 _last_send = 0.0
+_last_reset_state = 0 # リセットボタン状態管理
 
 def _open():
     global _ser
@@ -60,8 +61,17 @@ def _close():
         _ser = None
 
 def onFrameStart(frame):
-    global _last_send, _ser
+    global _last_send, _ser, _last_reset_state
     
+    # --- RESET_Button 連動 ---
+    reset_btn = op('../../RESET_Button')
+    if reset_btn:
+        curr_reset = reset_btn.panel.state
+        if curr_reset == 1 and _last_reset_state == 0:
+            print(f'[LED_X] Manual Reset Triggered')
+            _close()
+        _last_reset_state = curr_reset
+
     # 30FPS制限
     now = _time.perf_counter()
     if now - _last_send < 0.033:

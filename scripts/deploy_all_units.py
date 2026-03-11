@@ -64,14 +64,30 @@ def setup_unit(name, source_top, com_port, x, y):
     btn.par.h = 50
 
     # --- 5. Execute DAT の作成と設定 ---
-    ex = base.op('led_exec_x')
+    # 旧名称 (led_exec_x, multiなど) があれば停止してから削除
+    for legacy in ['led_exec_x', 'led_multi', 'led_exec_multi', 'led_exec_multi_relay']:
+        old = base.op(legacy)
+        if old:
+            print(f"  [CLEANUP] Stopping and destroying legacy node: {old.path}")
+            old.par.active = False
+            try: old.run('stop')
+            except: pass
+            old.destroy()
+
+    ex = base.op('led_exec')
     if not ex:
-        ex = base.create(executeDAT, 'led_exec_x')
+        ex = base.create(executeDAT, 'led_exec')
+    else:
+        # 既存ノードがある場合も一度停止させる
+        ex.par.active = False
+        try: ex.run('stop')
+        except: pass
+    
     ex.par.framestart = True
     ex.nodeX = 400
     ex.nodeY = 0
     
-    # スクリプトの適用 (USB以外は 88x10 専用、USBは 12x81 デバッグ版)
+    # スクリプトの適用
     if is_usb:
         script_path = project.folder + '/scripts/dats/led_sender_x_debug.py'
     else:
@@ -84,14 +100,106 @@ def setup_unit(name, source_top, com_port, x, y):
         print(f"  [ERROR] Failed to load script: {script_path}")
         pass
     
-    # 確実にエクスプレッションを上書き（絶対パスを使用）
-    # パラメータモードを明示的に変更して、以前の不正な参照をクリアする
+    # 確実にエクスプレッションを上書き
     ex.par.active.mode = ParMode.CONSTANT
     ex.par.active = 0
     ex.par.active.mode = ParMode.EXPRESSION
     ex.par.active.expr = f"op('{btn.path}').panel.state"
     
-    print(f"Done: {name} (via {btn.name})")
+    print(f"Done: {name} (via {btn.name}, node: {ex.name})")
+
+def setup_global_reset():
+    parent_path = '/AudioLinkLight_V01/LED_OUTPUT'
+    parent = op(parent_path)
+    if not parent: return
+
+    btn = parent.op('RESET_Button')
+    if not btn: return
+
+    # --- プロジェクト全体を対象とした徹底クリーンアップ ---
+    print("\n[CLEANUP] Purging ALL competing reset logic nodes...")
+    
+    # 1. 'led_exec_multi' 文字列を含む全DATを排除
+    for n in root.findChildren(type=DAT):
+        if n.isDAT and n.text and 'led_exec_multi' in n.text:
+            if 'deploy_all_units' in n.name: continue
+            print(f"  [DESTROY] Found legacy script containing 'led_exec_multi': {n.path}")
+            try: n.par.active = False
+            except: pass
+            n.destroy()
+
+    # 2. RESET_Button を監視している全 Panel Execute を検索（新名称以外）
+    rex_unique_name = 'RESET_ALL_UNITS_LOGIC'
+    for n in root.findChildren(type=panelexecuteDAT):
+        if n.name == rex_unique_name: continue
+        
+        panel_path = str(getattr(n.par, 'panel', ''))
+        if btn.path in panel_path or btn.name in panel_path:
+            print(f"  [DESTROY] Found competing Panel Execute linked to RESET_Button: {n.path}")
+            n.destroy()
+
+    # 3. 新しいリセットロジックの作成
+    rex = parent.op(rex_unique_name)
+    if rex: rex.destroy()
+    rex = parent.create(panelexecuteDAT, rex_unique_name)
+    
+    rex.par.panel = btn.path
+    rex.par.valuechange = True
+    rex.nodeX = btn.nodeX
+    rex.nodeY = btn.nodeY - 100
+    
+    script = """# Automatically generated Blackout-Reset logic (v12)
+def onValueChange(panelValue):
+    if panelValue.name == 'state' and panelValue.val == 1:
+        print('\\n--- GLOBAL BLACKOUT & RESET TRIGGERED ---')
+        
+        containers = [
+            'led_source_u1', 'led_source', 'led_source_d1', 'led_source_USB'
+        ]
+        
+        # Step 1: 各ユニットにブラックアウト信号を送信
+        for c_name in containers:
+            c = parent().op(c_name)
+            if not c: continue
+            ex = c.op('led_exec')
+            if ex and hasattr(ex.module, '_ser') and ex.module._ser:
+                ser = ex.module._ser
+                if ser.is_open:
+                    try:
+                        num_leds = c.par.Ledcols.eval() * c.par.Ledrows.eval()
+                        header = bytes([0x55, 0xAA, num_leds & 0xFF, (num_leds >> 8) & 0xFF])
+                        blackout = header + bytes(num_leds * 3)
+                        ser.write(blackout)
+                        ser.flush()
+                        print(f'  [BLACKOUT] Sent to {c_name}')
+                    except: pass
+
+        # Step 2: 全ポートを強制クローズ (5フレーム後)
+        def step_close():
+            for c_name in containers:
+                c = parent().op(c_name)
+                if c and c.op('led_exec'):
+                    node = c.op('led_exec')
+                    node.par.active = False
+                    try: node.run('stop')
+                    except: pass
+                    print(f'  [CLOSED] {c_name}')
+
+        run("args[0]()", step_close, delayFrames=5)
+        
+        # Step 3: 全ポートを再開 (55フレーム後)
+        def step_open():
+            for c_name in containers:
+                c = parent().op(c_name)
+                if c and c.op('led_exec'):
+                    c.op('led_exec').par.active = True
+                    print(f'  [RESTARTED] {c_name}')
+            print('--- RESET SEQUENCE COMPLETE ---')
+
+        run("args[0]()", step_open, delayFrames=55)
+"""
+    rex.text = script
+    print(f"  [LOGIC] RESET_Button link established ONLY via {rex.path}")
 
 # 配置の基準
 START_X = 0
@@ -106,8 +214,16 @@ units = [
     ('LED_SOURCE_USB',   '/AudioLinkLight_V01/LED_OUTPUT/led_source_USB', 'COM19', START_X, START_Y - Y_STEP*3),
 ]
 
-for u in units:
-    setup_unit(*u)
+# メイン処理
+print("\n--- DEPLOY START (v12: MEGA CLEAN) ---")
 
-print("\n--- DEPLOY COMPLETE (FIXED VERSION) ---")
-print("Verified linking and cleaned up duplicates.")
+parent = op('/AudioLinkLight_V01/LED_OUTPUT')
+if parent:
+    # 既存の競合リセットノードを掃除してから構築
+    setup_global_reset()
+
+    for u in units:
+        setup_unit(*u)
+
+print("\n--- DEPLOY COMPLETE (v12) ---")
+print("All legacy references scrubbed. RESET_Button logic updated with Blackout.")
